@@ -19,6 +19,7 @@
  */
 package com.msopentech.odatajclient.plugin;
 
+import com.msopentech.odatajclient.engine.client.http.AbstractBasicAuthHttpClientFactory;
 import com.msopentech.odatajclient.engine.communication.request.retrieve.ODataMetadataRequest;
 import com.msopentech.odatajclient.engine.communication.request.retrieve.ODataRetrieveRequestFactory;
 import com.msopentech.odatajclient.engine.communication.response.ODataRetrieveResponse;
@@ -28,6 +29,7 @@ import com.msopentech.odatajclient.engine.data.metadata.edm.EntityContainer;
 import com.msopentech.odatajclient.engine.data.metadata.edm.EntitySet;
 import com.msopentech.odatajclient.engine.data.metadata.edm.EntityType;
 import com.msopentech.odatajclient.engine.data.metadata.edm.Schema;
+import com.msopentech.odatajclient.engine.utils.Configuration;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
@@ -67,6 +69,18 @@ public class MetadataMojo extends AbstractMojo {
      */
     @Parameter(property = "serviceRootURL", required = true)
     private String serviceRootURL;
+    
+    /**
+     * OData service username
+     */
+    @Parameter(property = "serviceUsername")
+    private String serviceUsername;
+    
+    /**
+     * OData service password
+     */
+    @Parameter(property = "servicePassword")
+    private String servicePassword;
 
     /**
      * Base package.
@@ -79,6 +93,27 @@ public class MetadataMojo extends AbstractMojo {
     private final Set<String> namespaces = new HashSet<String>();
 
     private static String TOOL_DIR = "ojc-plugin";
+    
+    private class BasicAccessAuthentication extends AbstractBasicAuthHttpClientFactory {
+        
+        private final String username;
+        private final String password;
+
+        public BasicAccessAuthentication(final String username, final String password) {
+            this.username = username;
+            this.password = password;
+        }
+
+        @Override
+        protected String getUsername() {
+            return this.username;
+        }
+
+        @Override
+        protected String getPassword() {
+            return this.password;
+        }
+    }
 
     @Override
     public void execute() throws MojoExecutionException {
@@ -90,6 +125,8 @@ public class MetadataMojo extends AbstractMojo {
         try {
             Velocity.addProperty(Velocity.RESOURCE_LOADER, "class");
             Velocity.addProperty("class.resource.loader.class", ClasspathResourceLoader.class.getName());
+    
+            determineAndSetBasicAuthentication();
 
             final ODataMetadataRequest req = ODataRetrieveRequestFactory.getMetadataRequest(serviceRootURL);
 
@@ -196,6 +233,12 @@ public class MetadataMojo extends AbstractMojo {
             throw (t instanceof MojoExecutionException)
                     ? (MojoExecutionException) t
                     : new MojoExecutionException("While executin mojo", t);
+        }
+    }
+
+    private void determineAndSetBasicAuthentication() {
+        if (this.serviceUsername != null) {
+            Configuration.setHttpClientFactory(new BasicAccessAuthentication(this.serviceUsername, this.servicePassword));
         }
     }
 
